@@ -36,7 +36,7 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
   };
 
   const processLines = async (action: 'play' | 'queue') => {
-    const lines = text.split('\n').filter(l => l.trim() !== '');
+    const lines = text.split('\n').filter(l => l.trim() !== '' && !l.trim().startsWith('#'));
     if (lines.length === 0) return;
 
     setIsProcessing(true);
