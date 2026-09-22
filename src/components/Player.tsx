@@ -10,6 +10,7 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
   const [text, setText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState('');
+  const [forcePwa, setForcePwa] = useState(false);
 
   const parseLine = (line: string) => {
     // Matches "Artist / Title" or "Artist - Title"
@@ -43,7 +44,7 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
     const api = getSpotifyApi();
 
     let targetDeviceId = deviceId;
-    if (api) {
+    if (api && !forcePwa) {
       try {
         const state = await api.player.getPlaybackState();
         if (state && state.device && state.device.is_active) {
@@ -135,6 +136,20 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
           disabled={isProcessing}
         />
         
+        <div className="flex items-center mb-4 space-x-2">
+          <input 
+            type="checkbox" 
+            id="force-pwa" 
+            checked={forcePwa}
+            onChange={(e) => setForcePwa(e.target.checked)}
+            disabled={isProcessing}
+            className="w-4 h-4 text-primary bg-surface border-gray-600 rounded focus:ring-primary cursor-pointer"
+          />
+          <label htmlFor="force-pwa" className="text-sm text-gray-300 cursor-pointer select-none">
+            Force playback on this device (PWA)
+          </label>
+        </div>
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
           <div className="text-sm text-gray-400 max-w-sm whitespace-pre-wrap">
             {message && (
