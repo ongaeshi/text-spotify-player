@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getSpotifyApi } from '../spotify';
-import { Play, ListPlus, Loader2 } from 'lucide-react';
+import { Play, ListPlus, Loader2, Copy } from 'lucide-react';
+
 
 interface PlayerProps {
   deviceId: string | null;
@@ -73,6 +74,32 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
       isMounted = false;
     };
   }, [text]);
+
+  const copyTrackLinks = () => {
+    const lines = text.split('\n').filter(l => l.trim() !== '' && !l.trim().startsWith('#'));
+    const urls: string[] = [];
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      const track = trackCache.current[trimmedLine];
+      if (track && track.external_urls?.spotify) {
+        urls.push(track.external_urls.spotify);
+      }
+    }
+
+    if (urls.length > 0) {
+      navigator.clipboard.writeText(urls.join('\n'))
+        .then(() => {
+          setMessage(`Copied ${urls.length} track links to clipboard!\n💡 Open a Spotify playlist on desktop and press Ctrl+V (or Cmd+V) to paste them.`);
+        })
+        .catch(err => {
+          console.error("Failed to copy links", err);
+          setMessage("Failed to copy links to clipboard.");
+        });
+    } else {
+      setMessage("No track links found to copy. Please wait for tracks to be resolved.");
+    }
+  };
 
   const processLines = async (action: 'play' | 'queue') => {
     const lines = text.split('\n').filter(l => l.trim() !== '' && !l.trim().startsWith('#'));
@@ -280,7 +307,16 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
               </span>
             )}
           </div>
-          <div className="flex space-x-3 w-full sm:w-auto">
+          <div className="flex flex-wrap justify-end gap-3 w-full sm:w-auto">
+            <button 
+              onClick={copyTrackLinks}
+              disabled={isProcessing || text.trim() === ''}
+              className="flex-1 sm:flex-none bg-surface hover:bg-gray-700 border border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-full transition-colors flex items-center justify-center space-x-2"
+              title="Copy Spotify track URLs to clipboard"
+            >
+              <Copy className="w-5 h-5" />
+              <span>Copy Links</span>
+            </button>
             <button 
               onClick={() => processLines('queue')}
               disabled={isProcessing || text.trim() === ''}
