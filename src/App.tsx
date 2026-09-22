@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { getSpotifyApi, initializeSpotify } from './spotify';
+import { useEffect, useState } from 'react';
+import { initializeSpotify } from './spotify';
 import { LoginScreen } from './components/LoginScreen';
 import { Player } from './components/Player';
 import { WebPlayback } from './components/WebPlayback';
