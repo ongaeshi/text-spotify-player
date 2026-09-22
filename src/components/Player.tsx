@@ -12,7 +12,7 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
   const [message, setMessage] = useState('');
   const [forcePwa, setForcePwa] = useState(false);
 
-  const [cacheTrigger, setCacheTrigger] = useState(0);
+  const [, setCacheTrigger] = useState(0);
   const trackCache = useRef<Record<string, any>>({});
   const searchInProgress = useRef<Set<string>>(new Set());
 
@@ -29,27 +29,19 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
     const api = getSpotifyApi();
     if (!api) return null;
 
-    // Spotify URL or URI check
-    const urlMatch = line.match(/open\.spotify\.com\/track\/([a-zA-Z0-9]+)/);
-    const uriMatch = line.match(/spotify:track:([a-zA-Z0-9]+)/);
-    const trackId = urlMatch ? urlMatch[1] : (uriMatch ? uriMatch[1] : null);
-
-    if (trackId) {
-      try {
-        return await api.tracks.getTrack(trackId);
-      } catch (e) {
-        console.warn("Failed to fetch track by ID:", e);
-        return null;
-      }
-    }
-
     const parsed = parseLine(line);
-    const query = parsed ? `artist:${parsed.artist} track:${parsed.title}` : line;
+    const query = parsed ? `${parsed.artist} ${parsed.title}` : line;
 
-    const searchResults = await api.search(query, ["track"], undefined, 1);
-    if (searchResults.tracks.items.length > 0) {
+    // Search for both track and episode
+    const searchResults = await api.search(query, ["track", "episode"], "JP", 1);
+    
+    // Return the first found item (prioritizing track if both are found, or episode if only episode is found)
+    if (searchResults.tracks && searchResults.tracks.items.length > 0) {
       return searchResults.tracks.items[0];
+    } else if (searchResults.episodes && searchResults.episodes.items.length > 0) {
+      return searchResults.episodes.items[0];
     }
+    
     return null;
   };
 
@@ -190,7 +182,15 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
           {validLines.map(({ line, trimmed, originalIndex }) => {
             const track = trackCache.current[trimmed];
             const isSearching = track === undefined;
-            const formalName = track ? `${track.artists.map((a: any) => a.name).join(', ')} / ${track.name}` : '';
+            
+            let formalName = '';
+            if (track) {
+              if (track.type === 'episode') {
+                formalName = `${track.show?.name || 'Podcast'} / ${track.name}`;
+              } else {
+                formalName = `${track.artists?.map((a: any) => a.name).join(', ')} / ${track.name}`;
+              }
+            }
             const isMatch = track && trimmed === formalName;
             
             return (
@@ -214,7 +214,7 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
                         target="_blank" 
                         rel="noreferrer"
                         className="text-primary hover:underline text-xs flex items-center"
-                        title={`${track.artists.map((a: any) => a.name).join(', ')} - ${track.name}`}
+                        title={formalName.replace(' / ', ' - ')}
                       >
                         🔗 Link
                       </a>
