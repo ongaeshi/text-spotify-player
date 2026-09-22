@@ -46,15 +46,15 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
     if (api) {
       try {
         const state = await api.player.getPlaybackState();
-        if (state && state.device && state.device.is_active && state.device.id) {
-          targetDeviceId = state.device.id;
+        if (state && state.device && state.device.is_active) {
+          targetDeviceId = state.device.id || "";
         }
       } catch (e) {
         console.warn("Failed to get playback state:", e);
       }
     }
 
-    if (!targetDeviceId) {
+    if (targetDeviceId === null || targetDeviceId === undefined) {
       setMessage("Player is not ready yet. Please wait or start playback on a device.");
       setIsProcessing(false);
       return;
