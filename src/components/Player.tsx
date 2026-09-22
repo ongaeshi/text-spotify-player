@@ -68,15 +68,26 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
         try {
           const track = await searchTrack(line);
           if (track) {
-            if (action === 'play' && i === 0) {
-              // First track for "Play All" -> start playback
-              await api?.player.startResumePlayback(targetDeviceId, undefined, [track.uri]);
-              // Wait a bit longer after starting playback to let the device state settle
-              await new Promise(resolve => setTimeout(resolve, 800));
-            } else {
-              // Queue the rest (or all, if action is "queue")
-              await api?.player.addItemToPlaybackQueue(track.uri, targetDeviceId);
+            try {
+              if (action === 'play' && i === 0) {
+                // First track for "Play All" -> start playback
+                await api?.player.startResumePlayback(targetDeviceId, undefined, [track.uri]);
+                // Wait a bit longer after starting playback to let the device state settle
+                await new Promise(resolve => setTimeout(resolve, 800));
+              } else {
+                // Queue the rest (or all, if action is "queue")
+                await api?.player.addItemToPlaybackQueue(track.uri, targetDeviceId);
+              }
+            } catch (playbackError: any) {
+              const errMsg = playbackError?.message || '';
+              if (errMsg.includes('JSON') || errMsg.includes('Unexpected token') || errMsg.includes('unexpected character')) {
+                // The SDK throws JSON parse errors on some valid 20x empty responses from Spotify's queue API.
+                // We can safely ignore these and treat the operation as successful.
+              } else {
+                throw playbackError; // Rethrow actual errors to the outer catch
+              }
             }
+            
             successCount++;
             // Delay to prevent API rate limiting or state conflicts
             await new Promise(resolve => setTimeout(resolve, 500));
