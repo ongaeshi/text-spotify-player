@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getSpotifyApi } from '../spotify';
 import { Play, ListPlus, Loader2 } from 'lucide-react';
 
@@ -11,6 +11,10 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState('');
   const [forcePwa, setForcePwa] = useState(false);
+
+  const [cacheTrigger, setCacheTrigger] = useState(0);
+  const trackCache = useRef<Record<string, any>>({});
+  const searchInProgress = useRef<Set<string>>(new Set());
 
   const parseLine = (line: string) => {
     // Matches "Artist / Title" or "Artist - Title"
@@ -25,6 +29,20 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
     const api = getSpotifyApi();
     if (!api) return null;
 
+    // Spotify URL or URI check
+    const urlMatch = line.match(/open\.spotify\.com\/track\/([a-zA-Z0-9]+)/);
+    const uriMatch = line.match(/spotify:track:([a-zA-Z0-9]+)/);
+    const trackId = urlMatch ? urlMatch[1] : (uriMatch ? uriMatch[1] : null);
+
+    if (trackId) {
+      try {
+        return await api.tracks.getTrack(trackId);
+      } catch (e) {
+        console.warn("Failed to fetch track by ID:", e);
+        return null;
+      }
+    }
+
     const parsed = parseLine(line);
     const query = parsed ? `artist:${parsed.artist} track:${parsed.title}` : line;
 
@@ -34,6 +52,35 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
     }
     return null;
   };
+
+  useEffect(() => {
+    const rawLines = text.split('\n');
+    const validLines = rawLines.map(l => l.trim()).filter(l => l !== '' && !l.startsWith('#'));
+    
+    let isMounted = true;
+    const fetchMissing = async () => {
+      for (const line of validLines) {
+        if (trackCache.current[line] === undefined && !searchInProgress.current.has(line)) {
+          searchInProgress.current.add(line);
+          const track = await searchTrack(line);
+          if (isMounted) {
+            trackCache.current[line] = track;
+            setCacheTrigger(prev => prev + 1);
+          }
+          await new Promise(r => setTimeout(r, 300));
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      fetchMissing();
+    }, 800);
+
+    return () => {
+      clearTimeout(timer);
+      isMounted = false;
+    };
+  }, [text]);
 
   const processLines = async (action: 'play' | 'queue') => {
     const lines = text.split('\n').filter(l => l.trim() !== '' && !l.trim().startsWith('#'));
@@ -67,7 +114,14 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
         setMessage(`Processing (${i + 1}/${lines.length}): ${line}...`);
         
         try {
-          const track = await searchTrack(line);
+          const trimmedLine = line.trim();
+          let track = trackCache.current[trimmedLine];
+          if (track === undefined) {
+             track = await searchTrack(trimmedLine);
+             trackCache.current[trimmedLine] = track;
+             setCacheTrigger(prev => prev + 1);
+          }
+
           if (track) {
             try {
               if (action === 'play' && i === 0) {
@@ -120,6 +174,74 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const renderPreview = () => {
+    const rawLines = text.split('\n');
+    const validLines = rawLines.map((line, originalIndex) => ({ line, trimmed: line.trim(), originalIndex }))
+                               .filter(({ trimmed }) => trimmed !== '' && !trimmed.startsWith('#'));
+
+    if (validLines.length === 0) return null;
+
+    return (
+      <div className="mt-4 mb-4 bg-surface rounded-xl border border-gray-700 p-4">
+        <h2 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Tracks Preview</h2>
+        <ul className="space-y-2">
+          {validLines.map(({ line, trimmed, originalIndex }) => {
+            const track = trackCache.current[trimmed];
+            const isSearching = track === undefined;
+            const formalName = track ? `${track.artists.map((a: any) => a.name).join(', ')} / ${track.name}` : '';
+            const isMatch = track && trimmed === formalName;
+            
+            return (
+              <li key={originalIndex} className="flex flex-col sm:flex-row sm:items-center justify-between text-sm bg-gray-800 p-2 rounded">
+                <div className="flex-1 flex flex-col mr-4 overflow-hidden">
+                  <span className="truncate text-gray-300" title={line}>{line}</span>
+                  {track && !isMatch && (
+                    <span className="truncate text-gray-500 text-xs mt-0.5" title={formalName}>
+                      ↳ {formalName}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-3 shrink-0 mt-2 sm:mt-0">
+                  {isSearching && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+                  {track === null && <span className="text-red-400 text-xs">Not found</span>}
+                  {track && (
+                    <>
+                      <a 
+                        href={track.external_urls?.spotify} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-primary hover:underline text-xs flex items-center"
+                        title={`${track.artists.map((a: any) => a.name).join(', ')} - ${track.name}`}
+                      >
+                        🔗 Link
+                      </a>
+                      {!isMatch && (
+                        <button 
+                          onClick={() => {
+                            setText(prev => {
+                              const newLines = prev.split('\n');
+                              newLines[originalIndex] = formalName;
+                              return newLines.join('\n');
+                            });
+                          }}
+                          className="bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-xs text-white transition-colors"
+                          title="正式な名前でテキストを置き換える"
+                        >
+                          ✨ Fix Name
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
   };
 
   return (
@@ -177,6 +299,8 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
             </button>
           </div>
         </div>
+
+        {renderPreview()}
       </div>
     </div>
   );
