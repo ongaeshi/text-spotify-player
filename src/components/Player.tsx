@@ -38,14 +38,27 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
     const lines = text.split('\n').filter(l => l.trim() !== '');
     if (lines.length === 0) return;
 
-    if (!deviceId) {
-      setMessage("Player is not ready yet. Please wait.");
-      return;
-    }
-
     setIsProcessing(true);
     let successCount = 0;
     const api = getSpotifyApi();
+
+    let targetDeviceId = deviceId;
+    if (api) {
+      try {
+        const state = await api.player.getPlaybackState();
+        if (state && state.device && state.device.is_active && state.device.id) {
+          targetDeviceId = state.device.id;
+        }
+      } catch (e) {
+        console.warn("Failed to get playback state:", e);
+      }
+    }
+
+    if (!targetDeviceId) {
+      setMessage("Player is not ready yet. Please wait or start playback on a device.");
+      setIsProcessing(false);
+      return;
+    }
 
     try {
       for (let i = 0; i < lines.length; i++) {
@@ -57,12 +70,12 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
           if (track) {
             if (action === 'play' && i === 0) {
               // First track for "Play All" -> start playback
-              await api?.player.startResumePlayback(deviceId, undefined, [track.uri]);
+              await api?.player.startResumePlayback(targetDeviceId, undefined, [track.uri]);
               // Wait a bit longer after starting playback to let the device state settle
               await new Promise(resolve => setTimeout(resolve, 800));
             } else {
               // Queue the rest (or all, if action is "queue")
-              await api?.player.addItemToPlaybackQueue(track.uri, deviceId);
+              await api?.player.addItemToPlaybackQueue(track.uri, targetDeviceId);
             }
             successCount++;
             // Delay to prevent API rate limiting or state conflicts
