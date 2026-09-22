@@ -86,10 +86,15 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
         } catch (lineError: any) {
           console.error(`Error processing line ${i + 1} (${line}):`, lineError);
           // If a single line fails, we log it and continue to the next one
-          // rather than aborting the entire process
+          setMessage(prev => `${prev}\nError on line ${i + 1}: ${lineError?.message || 'Unknown error'}`);
         }
       }
-      setMessage(`Successfully processed ${successCount} out of ${lines.length} tracks.`);
+      
+      if (successCount === lines.length) {
+        setMessage(`Successfully processed ${successCount} out of ${lines.length} tracks.`);
+      } else {
+        setMessage(prev => `${prev}\nProcessed ${successCount} out of ${lines.length} tracks.`);
+      }
     } catch (e: any) {
       console.error("Global processing error:", e);
       setMessage(`An error occurred: ${e?.message || 'Unknown error'}`);
@@ -113,9 +118,9 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
         />
         
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-          <div className="text-sm text-gray-400 max-w-sm">
+          <div className="text-sm text-gray-400 max-w-sm whitespace-pre-wrap">
             {message && (
-              <span className={message.startsWith('Error') || message.includes('An error') ? 'text-red-400' : 'text-green-400'}>
+              <span className={message.startsWith('Error') || message.includes('An error') || message.includes('Processed 0') ? 'text-red-400' : 'text-green-400'}>
                 {message}
               </span>
             )}
