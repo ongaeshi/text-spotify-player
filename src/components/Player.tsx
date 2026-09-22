@@ -85,8 +85,15 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
           }
         } catch (lineError: any) {
           console.error(`Error processing line ${i + 1} (${line}):`, lineError);
-          // If a single line fails, we log it and continue to the next one
-          setMessage(prev => `${prev}\nError on line ${i + 1}: ${lineError?.message || 'Unknown error'}`);
+          const errMsg = lineError?.message || '';
+          
+          if (errMsg.includes('Restricted device') || errMsg.includes('403')) {
+            setMessage(prev => `${prev}\nError: The active device (e.g. Sonos) restricts remote playback via API. Cannot play or add to queue.`);
+            break;
+          } else {
+            // If a single line fails for other reasons, we log it and continue
+            setMessage(prev => `${prev}\nError on line ${i + 1}: ${errMsg || 'Unknown error'}`);
+          }
         }
       }
       
