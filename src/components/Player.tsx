@@ -8,7 +8,9 @@ interface PlayerProps {
 }
 
 export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => {
+    return localStorage.getItem('text-spotify-player-text') || '';
+  });
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState('');
   const [forcePwa, setForcePwa] = useState(false);
@@ -16,6 +18,10 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
   const [, setCacheTrigger] = useState(0);
   const trackCache = useRef<Record<string, any>>({});
   const searchInProgress = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    localStorage.setItem('text-spotify-player-text', text);
+  }, [text]);
 
   const parseLine = (line: string) => {
     // Matches "Artist / Title" or "Artist - Title"
