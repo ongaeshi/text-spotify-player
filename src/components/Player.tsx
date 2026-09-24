@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getSpotifyApi } from '../spotify';
-import { Play, Pause, ListPlus, Loader2, Copy } from 'lucide-react';
+import { Play, ListPlus, Loader2, Copy } from 'lucide-react';
 
 
 interface PlayerProps {
@@ -12,60 +12,16 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState('');
   const [forcePwa, setForcePwa] = useState(false);
-  const [playingPreviewUrl, setPlayingPreviewUrl] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [, setCacheTrigger] = useState(0);
   const trackCache = useRef<Record<string, any>>({});
-  const previewUrlCache = useRef<Record<string, string | null>>({});
   const searchInProgress = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    };
-  }, []);
-
-  const togglePreview = (url: string) => {
-    if (playingPreviewUrl === url) {
-      audioRef.current?.pause();
-      setPlayingPreviewUrl(null);
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      const audio = new Audio(url);
-      audio.addEventListener('ended', () => setPlayingPreviewUrl(null));
-      audio.play().catch(e => console.error("Error playing preview:", e));
-      audioRef.current = audio;
-      setPlayingPreviewUrl(url);
-    }
-  };
 
   const parseLine = (line: string) => {
     // Matches "Artist / Title" or "Artist - Title"
     const match = line.match(/^(.*?)\s*[/\\-]\s*(.*)$/);
     if (match) {
       return { artist: match[1].trim(), title: match[2].trim() };
-    }
-    return null;
-  };
-
-  const fetchItunesPreview = async (track: any) => {
-    if (!track || track.type !== 'track') return null;
-    try {
-      const artist = track.artists?.[0]?.name || '';
-      const title = track.name || '';
-      const query = encodeURIComponent(`${artist} ${title}`);
-      const res = await fetch(`https://itunes.apple.com/search?term=${query}&entity=song&limit=1`);
-      const data = await res.json();
-      if (data.results && data.results.length > 0) {
-        return data.results[0].previewUrl || null;
-      }
-    } catch (e) {
-      console.error("iTunes search error:", e);
     }
     return null;
   };
@@ -103,15 +59,6 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
           if (isMounted) {
             trackCache.current[line] = track;
             setCacheTrigger(prev => prev + 1);
-
-            if (track && track.type === 'track' && !(track as any).preview_url && previewUrlCache.current[track.id] === undefined) {
-              fetchItunesPreview(track).then(url => {
-                if (isMounted && url) {
-                  previewUrlCache.current[track.id] = url;
-                  setCacheTrigger(prev => prev + 1);
-                }
-              });
-            }
           }
           await new Promise(r => setTimeout(r, 300));
         }
@@ -289,19 +236,6 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
                   {track === null && <span className="text-red-400 text-xs">Not found</span>}
                   {track && (
                     <>
-                      {( (track.type === 'track' && (track as any).preview_url) || previewUrlCache.current[track.id]) && (
-                        <button
-                          onClick={() => togglePreview((track.type === 'track' && (track as any).preview_url) || previewUrlCache.current[track.id] as string)}
-                          className="text-primary hover:opacity-80 flex items-center transition-colors"
-                          title="Play Preview"
-                        >
-                          {playingPreviewUrl === ((track.type === 'track' && (track as any).preview_url) || previewUrlCache.current[track.id]) ? (
-                            <Pause className="w-4 h-4" fill="currentColor" />
-                          ) : (
-                            <Play className="w-4 h-4" fill="currentColor" />
-                          )}
-                        </button>
-                      )}
                       <a 
                         href={track.external_urls?.spotify} 
                         target="_blank" 
