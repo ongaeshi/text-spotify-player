@@ -261,7 +261,7 @@ export const Player: React.FC<PlayerProps> = ({ deviceId }) => {
                             });
                           }}
                           className="bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-xs text-white transition-colors"
-                          title="正式な名前でテキストを置き換える"
+                          title="Replace text with the formal name"
                         >
                           ✨ Fix Name
                         </button>
